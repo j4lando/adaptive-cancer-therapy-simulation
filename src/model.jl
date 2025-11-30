@@ -49,24 +49,12 @@ function cancer_step!(agent, model)
     end
 end
 
-function adjust_dosage!(model)
-    n = nagents(model)
-    n_0 = model.initial_agents
-    if n < n_0 * 0.5
-        model.dosage = 0
-    elseif n > (1 + model.beta) * n_0
-        model.dosage = (1 + model.alpha) * model.last_dosage
-        model.last_dosage = model.dosage
-    elseif n <= (1 - model.beta) * n_0
-        model.dosage = (1 - model.alpha) * model.last_dosage
-        model.last_dosage = model.dosage
-    end
-end
+
 
 function model_step!(model)
     model.time += 1
     if model.time % model.dosage_interval == 0
-        adjust_dosage!(model)
+        model.treatment_function(model)
     end
     step!(model)
 end

@@ -9,3 +9,4 @@ video(cancer, destination = "no_adaptive_cancer.mp4")
 
 cancer = initialize(3000, 42, tail_skew = .3, dosage = 0)
 video(cancer, time_steps = 50, destination = "front_cancer.mp4")
+
