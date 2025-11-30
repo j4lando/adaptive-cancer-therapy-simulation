@@ -17,10 +17,10 @@ function death(agent, model)
 end
 
 function cancer_step!(agent, model)
-    agent.age += 1
     open_positions = collect(empty_nearby_positions(agent, model))
 
     if !isempty(open_positions)
+        agent.age += 1
         if agent.age >= agent.cell_cycle
             if death(agent, model)
                 # agent dies

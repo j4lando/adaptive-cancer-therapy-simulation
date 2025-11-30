@@ -52,9 +52,9 @@ function initialize(
     alpha = 0.25, 
     beta = 0.05, 
     velocity = 0.1,
-    birth_population = 25,
+    birth_population = 20,
     dosage_interval = 72,
-    tail_skew = 2.0
+    tail_skew = 0.3
 )
     properties = Dict(
         :initial_agents => num_agents,
@@ -67,7 +67,7 @@ function initialize(
         :move => move,
         :alpha => alpha,
         :beta => beta,
-        :velocity => .1,
+        :velocity => 0.05,
         :time => 0,
         :dosage_interval => dosage_interval
     )
