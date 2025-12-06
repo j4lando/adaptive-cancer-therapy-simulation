@@ -1,9 +1,9 @@
-import Pkg; Pkg.add("Agents")
 using Agents
 
 @agent struct CancerAgent(GridAgent{2})
     cell_cycle::Int
     age::Int
+    dead::Bool
 end
 
 function death(agent, model)
@@ -17,34 +17,47 @@ function death(agent, model)
 end
 
 function cancer_step!(agent, model)
-    open_positions = collect(empty_nearby_positions(agent, model))
+    if !agent.dead
+        open_positions = collect(empty_nearby_positions(agent, model))
 
-    if !isempty(open_positions)
+        if !isempty(open_positions)
+            agent.age += 1
+            if agent.age >= agent.cell_cycle
+                if death(agent, model)
+                    # agent dies
+                    agent.dead = true
+                    agent.cell_cycle = model.abtosis
+                    agent.age = 0
+                    if agent.age >= agent.cell_cycle
+                        remove_agent!(agent, model)
+                    end
+                else
+                    # agent proliferates
+                    pos = rand(abmrng(model), open_positions)
+                    
+                    # 10% chance cell cycle mutates by ±1
+                    new_cycle = agent.cell_cycle
+                    r = rand(abmrng(model))
+                    if r < 0.05
+                        new_cycle = max(model.t_min, agent.cell_cycle - 1)
+                    elseif r < 0.10
+                        new_cycle = min(model.t_max, agent.cell_cycle + 1)
+                    end
+                    
+                    new_agent = CancerAgent(model, pos, new_cycle, 0, false)
+                    add_agent_own_pos!(new_agent, model)
+                end
+            elseif rand(abmrng(model)) < model.velocity
+                # agent moves
+                pos = rand(abmrng(model), open_positions)
+                move_agent!(agent, pos, model)
+            end
+        end
+    else
+        # dead agent countdown to removal
         agent.age += 1
         if agent.age >= agent.cell_cycle
-            if death(agent, model)
-                # agent dies
-                remove_agent!(agent, model)
-            else
-                # agent proliferates
-                pos = rand(abmrng(model), open_positions)
-                
-                # 10% chance cell cycle mutates by ±1
-                new_cycle = agent.cell_cycle
-                r = rand(abmrng(model))
-                if r < 0.05
-                    new_cycle = max(model.t_min, agent.cell_cycle - 1)
-                elseif r < 0.10
-                    new_cycle = min(model.t_max, agent.cell_cycle + 1)
-                end
-                
-                new_agent = CancerAgent(model, pos, new_cycle, 0)
-                add_agent_own_pos!(new_agent, model)
-            end
-        elseif rand(abmrng(model)) < model.velocity
-            # agent moves
-            pos = rand(abmrng(model), open_positions)
-            move_agent!(agent, pos, model)
+            remove_agent!(agent, model)
         end
     end
 end

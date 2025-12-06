@@ -12,8 +12,10 @@ function default_adaptive_treatment(n, n_0, alpha, beta, initial_dosage = 1.0)
         new_dosage = (1 + alpha) * initial_dosage
     elseif n <= (1 - beta) * n_0
         new_dosage = (1 - alpha) * initial_dosage
+    else
+        new_dosage = initial_dosage
     end
-    
+
     return min(new_dosage, 1.0)
 end
 
@@ -90,4 +92,4 @@ function plot_treatment_strategies(;
 end
 
 # Run the visualization
-plot_treatment_strategies()
+plot_treatment_strategies(initial_dosage = 1.0)

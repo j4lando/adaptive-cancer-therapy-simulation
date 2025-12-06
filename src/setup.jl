@@ -1,16 +1,11 @@
-import Pkg
-Pkg.add("Agents")
-Pkg.add("Random")
-Pkg.add("Distributions")
-Pkg.add("StatsBase")
-
 using Agents
 using Random
 using Distributions
 using StatsBase
 
-include("model.jl")
-include("treatment.jl")
+import FromFile: @from
+@from "treatment.jl" import default_adaptive_treatment!, smooth_adaptive_treatment!
+@from "model.jl" import CancerAgent, cancer_step!
 
 function centered_positions(rng::AbstractRNG, cx::Int, cy::Int, σ::Float64, rmax::Float64, N::Int)
     # 1. Generate all integer grid points within rmax
@@ -56,7 +51,8 @@ function initialize(
     birth_population = 20,
     dosage_interval = 72,
     tail_skew = 0.3,
-    treatment_function = default_adaptive_treatment!
+    treatment_function = default_adaptive_treatment!,
+    abtosis = 0
 )
     properties = Dict(
         :initial_agents => num_agents,
@@ -72,7 +68,8 @@ function initialize(
         :velocity => 0.05,
         :time => 0,
         :dosage_interval => dosage_interval,
-        :treatment_function! => treatment_function
+        :treatment_function => treatment_function,
+        :abtosis => abtosis
     )
 
     space = GridSpaceSingle((size, size), periodic = false, metric = :chebyshev)
@@ -97,7 +94,7 @@ function initialize(
         
         cycle = round(Int, t_min + (t_max - t_min) * bias)
         
-        add_agent!(pos, model; cell_cycle = cycle, age = 0)
+        add_agent!(pos, model; cell_cycle = cycle, age = 0, dead = false)
         #add_agent!(pos, model; cell_cycle = rand(rng, t_min:t_max), age = 0)
     end
 
