@@ -38,9 +38,9 @@ function cancer_step!(agent, model)
                     # 10% chance cell cycle mutates by ±1
                     new_cycle = agent.cell_cycle
                     r = rand(abmrng(model))
-                    if r < 0.05
+                    if r < model.evolution_rate / 2
                         new_cycle = max(model.t_min, agent.cell_cycle - 1)
-                    elseif r < 0.10
+                    elseif r < model.evolution_rate
                         new_cycle = min(model.t_max, agent.cell_cycle + 1)
                     end
                     
@@ -65,9 +65,7 @@ end
 
 
 function model_step!(model)
-    model.time += 1
-    if model.time % model.dosage_interval == 0
+    if abmtime(model) % model.dosage_interval == 0
         model.treatment_function(model)
     end
-    step!(model)
 end

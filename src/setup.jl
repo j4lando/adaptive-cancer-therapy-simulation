@@ -4,8 +4,8 @@ using Distributions
 using StatsBase
 
 import FromFile: @from
-@from "treatment.jl" import default_adaptive_treatment!, smooth_adaptive_treatment!
-@from "model.jl" import CancerAgent, cancer_step!
+@from "treatment.jl" import default_adaptive_treatment!
+@from "model.jl" import CancerAgent, cancer_step!, model_step!
 
 function centered_positions(rng::AbstractRNG, cx::Int, cy::Int, σ::Float64, rmax::Float64, N::Int)
     # 1. Generate all integer grid points within rmax
@@ -52,7 +52,10 @@ function initialize(
     dosage_interval = 72,
     tail_skew = 0.3,
     treatment_function = default_adaptive_treatment!,
-    abtosis = 0
+    abtosis = 0,
+    initial_velocity = 0.05,
+    evolution_rate = 0.1,
+    di2 = 72
 )
     properties = Dict(
         :initial_agents => num_agents,
@@ -65,11 +68,12 @@ function initialize(
         :move => move,
         :alpha => alpha,
         :beta => beta,
-        :velocity => 0.05,
-        :time => 0,
-        :dosage_interval => dosage_interval,
+        :velocity => initial_velocity,
+        :dosage_interval => 1000000,
         :treatment_function => treatment_function,
-        :abtosis => abtosis
+        :abtosis => abtosis,
+        :evolution_rate => evolution_rate,
+        :di2 => dosage_interval
     )
 
     space = GridSpaceSingle((size, size), periodic = false, metric = :chebyshev)
@@ -77,10 +81,10 @@ function initialize(
 
     model = StandardABM(
         CancerAgent, space; 
-        agent_step! = cancer_step!, properties, rng)
+        agent_step! = cancer_step!, model_step! = model_step!, properties, rng)
 
 
-    max_distance = sqrt(birth_population/3)
+    max_distance = sqrt(birth_population/2)
     center = Int(size / 2)
     initial_pos = centered_positions(rng, center, center, initial_variance, max_distance, birth_population)
 
@@ -94,12 +98,13 @@ function initialize(
         
         cycle = round(Int, t_min + (t_max - t_min) * bias)
         
-        add_agent!(pos, model; cell_cycle = cycle, age = 0, dead = false)
+        add_agent!(pos, model; cell_cycle = cycle, age = rand(rng, 0:cycle-1), dead = false)
         #add_agent!(pos, model; cell_cycle = rand(rng, t_min:t_max), age = 0)
     end
 
     condition(model, time) = nagents(model) >= num_agents
     step!(model, condition)
+    model.dosage_interval = dosage_interval
     model.velocity = velocity
     model.dosage = dosage
     model.initial_agents = nagents(model)
