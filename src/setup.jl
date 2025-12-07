@@ -55,7 +55,8 @@ function initialize(
     abtosis = 0,
     initial_velocity = 0.05,
     evolution_rate = 0.1,
-    di2 = 72
+    di2 = 72,
+    gamma = 2.0
 )
     properties = Dict(
         :initial_agents => num_agents,
@@ -73,7 +74,8 @@ function initialize(
         :treatment_function => treatment_function,
         :abtosis => abtosis,
         :evolution_rate => evolution_rate,
-        :di2 => dosage_interval
+        :di2 => di2,
+        :gamma => gamma
     )
 
     space = GridSpaceSingle((size, size), periodic = false, metric = :chebyshev)
@@ -102,7 +104,7 @@ function initialize(
         #add_agent!(pos, model; cell_cycle = rand(rng, t_min:t_max), age = 0)
     end
 
-    condition(model, time) = nagents(model) >= num_agents
+    condition(model,time) = nagents(model) >= num_agents || time >= 1000
     step!(model, condition)
     model.dosage_interval = dosage_interval
     model.velocity = velocity

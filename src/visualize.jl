@@ -88,7 +88,7 @@ function video(model; destination = "cancer.mp4", time_steps = 1000, break_condi
         xlabel = "Time",
         ylabel = "Dosage")
     lines!(ax_dosage_only, time_points, dosages, color = :blue, linewidth = 2)
-    ylims!(ax_dosage_only, 0, model.last_dosage * 1.1)
+    ylims!(ax_dosage_only, 0, 1.5)
     
     dosage_graph_path = replace(destination, ".mp4" => "_dosage.png")
     save(dosage_graph_path, fig_dosage)
@@ -237,7 +237,7 @@ function multi_snapshot(model; destination = "cancer_snapshots", time_steps = 10
         xlabel = "Time",
         ylabel = "Dosage")
     lines!(ax_dosage, time_points, dosages, color = :blue, linewidth = 2)
-    ylims!(ax_dosage, 0, model.last_dosage * 1.1)
+    ylims!(ax_dosage, 0, 1.5)
     save("$(destination)_dosage.png", fig_dosage)
     
     # Save agent count plot
