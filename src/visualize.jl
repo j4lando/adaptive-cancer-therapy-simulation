@@ -7,10 +7,12 @@ using DataFrames
 import FromFile: @from
 @from "model.jl" import model_step! 
 
-function video(model; destination = "cancer.mp4", time_steps = 1000, break_condition = 13000, fps = 30, resolution = (1000, 800))
+function video(model; destination = "cancer.mp4", time_steps = 1000, break_condition = 13000, fps = 30, resolution = (1000, 800), time_resolution = 1)
 
+    # White (0% resistance) to Red (100% resistance)
+    resistance_cmap = cgrad(:Reds, rev = false)
     groupcolor(agent) = get(
-        colorschemes[:rainbow], 
+        resistance_cmap, 
         (agent.cell_cycle - model.t_min) / (model.t_max - model.t_min)
     )
 
@@ -19,11 +21,11 @@ function video(model; destination = "cancer.mp4", time_steps = 1000, break_condi
     # Main ABM plot area
     ax_abm = Axis(fig[1, 1], title = "Cancer cell simulation")
     
-    # Create colorbar for cell cycle
+    # Create colorbar for resistance
     Colorbar(fig[1, 2], 
-        colormap = :rainbow,
-        limits = (model.t_min, model.t_max),
-        label = "Cell Cycle Time",
+        colormap = resistance_cmap,
+        limits = (0, 1),
+        label = "Resistance",
         width = 20)
     
     # Dosage indicator text
@@ -63,7 +65,10 @@ function video(model; destination = "cancer.mp4", time_steps = 1000, break_condi
             # Update dosage label
             dosage_label.text = @sprintf("Current Dosage: %.3f | Agents: %d", model.dosage, nagents(model))
             
-            recordframe!(io)
+            if i % time_resolution == 0
+                recordframe!(io)
+            end
+            
             
             actual_steps = i + 1
             
@@ -108,8 +113,10 @@ end
 
 function snapshot(model; destination = "cancer_snapshot.png", resolution = (1000, 800))
     
+    # White (0% resistance) to Red (100% resistance)
+    resistance_cmap = cgrad(:Reds, rev = false)
     groupcolor(agent) = get(
-        colorschemes[:rainbow], 
+        resistance_cmap, 
         (agent.cell_cycle - model.t_min) / (model.t_max - model.t_min)
     )
 
@@ -118,11 +125,11 @@ function snapshot(model; destination = "cancer_snapshot.png", resolution = (1000
     # Main plot area
     ax = Axis(fig[1, 1], title = "Cancer cell simulation")
     
-    # Create colorbar for cell cycle
+    # Create colorbar for resistance
     Colorbar(fig[1, 2], 
-        colormap = :rainbow,
-        limits = (model.t_min, model.t_max),
-        label = "Cell Cycle Time",
+        colormap = resistance_cmap,
+        limits = (0, 1),
+        label = "Resistance",
         width = 20)
     
     # Dosage and agent count info
@@ -145,110 +152,158 @@ function snapshot(model; destination = "cancer_snapshot.png", resolution = (1000
     return fig
 end
 
-function multi_snapshot(model; destination = "cancer_snapshots", time_steps = 1000, break_condition = 13000, interval = 100)
+function multi_snapshot(models; destinations = nothing, time_steps = 1000, break_condition = 13000, interval = 100, combined_name = "combined")
     
-    groupcolor(agent) = get(
-        colorschemes[:rainbow], 
-        (agent.cell_cycle - model.t_min) / (model.t_max - model.t_min)
-    )
+    # Set default destinations if not provided
+    if destinations === nothing
+        destinations = ["model_$(i)" for i in 1:length(models)]
+    end
     
-    # Initialize vectors for tracking metrics
-    dosages = Vector{Float64}(undef, time_steps + 1)
-    agent_counts = Vector{Int}(undef, time_steps + 1)
+    @assert length(models) == length(destinations) "Number of models must match number of destinations"
     
-    # Record initial state
-    dosages[1] = model.dosage
-    agent_counts[1] = nagents(model)
+    num_models = length(models)
     
-    # Save initial snapshot
-    snapshot_count = 0
-    fig = Figure(resolution = (1000, 800))
-    ax = Axis(fig[1, 1], title = "Cancer cell simulation - Step 0")
+    # Initialize storage for all models
+    all_dosages = [Vector{Float64}(undef, time_steps + 1) for _ in 1:num_models]
+    all_agent_counts = [Vector{Int}(undef, time_steps + 1) for _ in 1:num_models]
+    all_actual_steps = ones(Int, num_models)
+    snapshot_counts = zeros(Int, num_models)
     
-    Colorbar(fig[1, 2], 
-        colormap = :rainbow,
-        limits = (model.t_min, model.t_max),
-        label = "Cell Cycle Time",
-        width = 20)
+    # Record initial states and save initial snapshots
+    for (m_idx, (model, destination)) in enumerate(zip(models, destinations))
+        # White (0% resistance) to Red (100% resistance)
+        resistance_cmap = cgrad(:Reds, rev = false)
+        groupcolor(agent) = get(
+            resistance_cmap, 
+            (agent.cell_cycle - model.t_min) / (model.t_max - model.t_min)
+        )
+        
+        all_dosages[m_idx][1] = model.dosage
+        all_agent_counts[m_idx][1] = nagents(model)
+        
+        # Save initial snapshot
+        fig = Figure(resolution = (1000, 800))
+        ax = Axis(fig[1, 1], title = "Cancer cell simulation - Step 0")
+        
+        Colorbar(fig[1, 2], 
+            colormap = resistance_cmap,
+            limits = (0, 1),
+            label = "Resistance",
+            width = 20)
+        
+        Label(fig[2, 1:2], 
+            text = @sprintf("Timestep: 0 | Dosage: %.3f | Agents: %d", 
+                model.dosage, nagents(model)),
+            tellwidth = false,
+            fontsize = 16,
+            halign = :center)
+        
+        abmplot!(ax, model; agent_color = groupcolor, agent_marker = :circle, as = 10)
+        save("$(destination)_$(lpad(snapshot_counts[m_idx], 4, '0')).png", fig)
+        snapshot_counts[m_idx] += 1
+    end
     
-    Label(fig[2, 1:2], 
-        text = @sprintf("Timestep: 0 | Dosage: %.3f | Agents: %d", 
-            model.dosage, nagents(model)),
-        tellwidth = false,
-        fontsize = 16,
-        halign = :center)
-    
-    abmplot!(ax, model; agent_color = groupcolor, agent_marker = :circle, as = 10)
-    save("$(destination)_$(lpad(snapshot_count, 4, '0')).png", fig)
-    snapshot_count += 1
-    
-    actual_steps = 1
-    
-    # Run simulation
+    # Run simulation for all models
     for i in 1:time_steps
-        step!(model)
-        
-        # Update metrics tracking
-        dosages[i + 1] = model.dosage
-        agent_counts[i + 1] = nagents(model)
-        
-        actual_steps = i + 1
-        
-        # Take snapshot at intervals
-        if i % interval == 0
-            fig = Figure(resolution = (1000, 800))
-            ax = Axis(fig[1, 1], title = "Cancer cell simulation - Step $i")
+        for (m_idx, (model, destination)) in enumerate(zip(models, destinations))
+            # Skip this model if it already stopped
+            if nagents(model) > break_condition || nagents(model) == 0
+                continue
+            end
             
-            Colorbar(fig[1, 2], 
-                colormap = :rainbow,
-                limits = (model.t_min, model.t_max),
-                label = "Cell Cycle Time",
-                width = 20)
+            step!(model)
             
-            Label(fig[2, 1:2], 
-                text = @sprintf("Timestep: %d | Dosage: %.3f | Agents: %d", 
-                    i, model.dosage, nagents(model)),
-                tellwidth = false,
-                fontsize = 16,
-                halign = :center)
+            # Update metrics tracking
+            all_dosages[m_idx][i + 1] = model.dosage
+            all_agent_counts[m_idx][i + 1] = nagents(model)
             
-            abmplot!(ax, model; agent_color = groupcolor, agent_marker = :circle, as = 10)
-            save("$(destination)_$(lpad(snapshot_count, 4, '0')).png", fig)
-            snapshot_count += 1
+            all_actual_steps[m_idx] = i + 1
+            
+            # Take snapshot at intervals
+            if i % interval == 0
+                # White (0% resistance) to Red (100% resistance)
+                resistance_cmap = cgrad(:Reds, rev = false)
+                groupcolor(agent) = get(
+                    resistance_cmap, 
+                    (agent.cell_cycle - model.t_min) / (model.t_max - model.t_min)
+                )
+                
+                fig = Figure(resolution = (1000, 800))
+                ax = Axis(fig[1, 1], title = "Cancer cell simulation - Step $i")
+                
+                Colorbar(fig[1, 2], 
+                    colormap = resistance_cmap,
+                    limits = (0, 1),
+                    label = "Resistance",
+                    width = 20)
+                
+                Label(fig[2, 1:2], 
+                    text = @sprintf("Timestep: %d | Dosage: %.3f | Agents: %d", 
+                        i, model.dosage, nagents(model)),
+                    tellwidth = false,
+                    fontsize = 16,
+                    halign = :center)
+                
+                abmplot!(ax, model; agent_color = groupcolor, agent_marker = :circle, as = 10)
+                save("$(destination)_$(lpad(snapshot_counts[m_idx], 4, '0')).png", fig)
+                snapshot_counts[m_idx] += 1
+            end
         end
         
-        # Custom stopping condition
-        if nagents(model) > break_condition || nagents(model) == 0
+        # Break if all models have stopped
+        if all(m_idx -> nagents(models[m_idx]) > break_condition || nagents(models[m_idx]) == 0, 1:num_models)
             break
         end
     end
     
-    # Trim vectors to actual steps taken
-    resize!(dosages, actual_steps)
-    resize!(agent_counts, actual_steps)
+    # Process each model's data and create individual dosage plots
+    for (m_idx, destination) in enumerate(destinations)
+        actual_steps = all_actual_steps[m_idx]
+        
+        # Trim vectors to actual steps taken
+        dosages = all_dosages[m_idx][1:actual_steps]
+        
+        # Convert time steps to days
+        time_days = range(0, (actual_steps - 1) / 24, length = actual_steps)
+        
+        # Save dosage plot with filled area
+        fig_dosage = Figure(resolution = (800, 600))
+        ax_dosage = Axis(fig_dosage[1, 1],
+            title = "Dosage over Time",
+            xlabel = "Time (days)",
+            ylabel = "Dosage")
+        
+        # Fill area under curve
+        band!(ax_dosage, time_days, zeros(length(dosages)), dosages, color = (:blue, 0.3))
+        lines!(ax_dosage, time_days, dosages, color = :blue, linewidth = 2)
+        ylims!(ax_dosage, 0, 1.5)
+        save("$(destination)_dosage.png", fig_dosage)
+        
+        println("Model $(m_idx): Saved $(snapshot_counts[m_idx]) snapshots and dosage graph")
+    end
     
-    # Create time linespace starting at 0
-    time_points = range(0, actual_steps - 1, length = actual_steps)
-    
-    # Save dosage plot
-    fig_dosage = Figure(resolution = (800, 600))
-    ax_dosage = Axis(fig_dosage[1, 1],
-        title = "Dosage over Time",
-        xlabel = "Time",
-        ylabel = "Dosage")
-    lines!(ax_dosage, time_points, dosages, color = :blue, linewidth = 2)
-    ylims!(ax_dosage, 0, 1.5)
-    save("$(destination)_dosage.png", fig_dosage)
-    
-    # Save agent count plot
+    # Create combined agent count plot
     fig_agents = Figure(resolution = (800, 600))
     ax_agents = Axis(fig_agents[1, 1],
-        title = "Agent Count over Time",
-        xlabel = "Time",
+        title = "Agent Count over Time (All Models)",
+        xlabel = "Time (days)",
         ylabel = "Number of Agents")
-    lines!(ax_agents, time_points, agent_counts, color = :red, linewidth = 2)
-    save("$(destination)_agents.png", fig_agents)
     
-    println("Saved $snapshot_count snapshots and 2 metric graphs")
+    colors = [:red, :green, :purple, :orange, :cyan, :magenta]
+    
+    for (m_idx, destination) in enumerate(destinations)
+        actual_steps = all_actual_steps[m_idx]
+        agent_counts = all_agent_counts[m_idx][1:actual_steps]
+        time_days = range(0, (actual_steps - 1) / 24, length = actual_steps)
+        
+        color = colors[mod1(m_idx, length(colors))]
+        lines!(ax_agents, time_days, agent_counts, color = color, linewidth = 4, label = destination)
+    end
+    
+    ylims!(ax_agents, 0, break_condition)
+    axislegend(ax_agents, position = :lt)
+    save("$(combined_name)_agents.png", fig_agents)
+    
+    println("Saved combined agent count graph as $(combined_name)_agents.png")
 end
 

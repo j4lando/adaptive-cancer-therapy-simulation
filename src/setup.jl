@@ -4,7 +4,7 @@ using Distributions
 using StatsBase
 
 import FromFile: @from
-@from "treatment.jl" import default_adaptive_treatment!
+@from "treatment.jl" import default_adaptive_treatment!, smooth_adaptive_treatment!, decreasing_adaptive_treatment!, smart_vacation_treatment!
 @from "model.jl" import CancerAgent, cancer_step!, model_step!
 
 function centered_positions(rng::AbstractRNG, cx::Int, cy::Int, σ::Float64, rmax::Float64, N::Int)
@@ -56,12 +56,14 @@ function initialize(
     initial_velocity = 0.05,
     evolution_rate = 0.1,
     di2 = 72,
-    gamma = 2.0
+    gamma = 2.0,
+    mean = 1.0,
+    std = 0.05
 )
     properties = Dict(
         :initial_agents => num_agents,
         :dosage => 0,
-        :last_dosage => dosage,
+        :last_dosage => 0,
         :hill_n => hill_n,
         :hill_k => hill_k,
         :t_min => t_min,
@@ -73,8 +75,8 @@ function initialize(
         :dosage_interval => 1000000,
         :treatment_function => treatment_function,
         :abtosis => abtosis,
-        :evolution_rate => evolution_rate,
-        :di2 => di2,
+        :evolution_rate => 0.0,
+        :di2 => 1,
         :gamma => gamma
     )
 
@@ -91,16 +93,19 @@ function initialize(
     initial_pos = centered_positions(rng, center, center, initial_variance, max_distance, birth_population)
 
     for pos in initial_pos
-        distance = sqrt((pos[1] - center)^2 + (pos[2] - center)^2)
-        normalized_distance = distance / max_distance
+        # distance = sqrt((pos[1] - center)^2 + (pos[2] - center)^2)
+        # normalized_distance = distance / max_distance
         
-        # Apply tail skew: higher values push towards extremes (tmin/tmax)
-        # tail_skew = 1.0 is linear, > 1.0 skews to tails, < 1.0 skews to center
-        bias = 1 - normalized_distance^tail_skew
+        # # Apply tail skew: higher values push towards extremes (tmin/tmax)
+        # # tail_skew = 1.0 is linear, > 1.0 skews to tails, < 1.0 skews to center
+        # bias = 1 - normalized_distance^tail_skew
         
-        cycle = round(Int, t_min + (t_max - t_min) * bias)
+        # cycle = round(Int, t_min + (t_max - t_min) * bias)
+        d = Normal(mean,std)
+        sensitivity = rand(rng, d)
+        cycle = round(Int, clamp((t_max-t_min)*(1 - sensitivity) + t_min, t_min, t_max)) 
         
-        add_agent!(pos, model; cell_cycle = cycle, age = rand(rng, 0:cycle-1), dead = false)
+        add_agent!(pos, model; cell_cycle = cycle, age = 0, dead = false)
         #add_agent!(pos, model; cell_cycle = rand(rng, t_min:t_max), age = 0)
     end
 
@@ -109,7 +114,11 @@ function initialize(
     model.dosage_interval = dosage_interval
     model.velocity = velocity
     model.dosage = dosage
+    model.last_dosage = dosage
     model.initial_agents = nagents(model)
+    model.evolution_rate = evolution_rate
+    model.treatment_function(model)
+    model.di2 = di2
 
     return model
 end
