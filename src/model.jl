@@ -52,6 +52,8 @@ function cancer_step!(agent, model)
                 pos = rand(abmrng(model), open_positions)
                 move_agent!(agent, pos, model)
             end
+        elseif model.age
+            agent.age += 1
         end
     else
         # dead agent countdown to removal

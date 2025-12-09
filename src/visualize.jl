@@ -7,6 +7,8 @@ using DataFrames
 import FromFile: @from
 @from "model.jl" import model_step! 
 
+"""AI Generated functions for visualization of the cancer model."""
+
 function video(model; destination = "cancer.mp4", time_steps = 1000, break_condition = 13000, fps = 30, resolution = (1000, 800), time_resolution = 1)
 
     # White (0% resistance) to Red (100% resistance)

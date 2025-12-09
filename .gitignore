@@ -1,4 +1,4 @@
 *.mp4
 .DS_Store
 *.png
-src/decreasing-test.jl
+src/*-sanity-test.jl
